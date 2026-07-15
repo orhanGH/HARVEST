@@ -27,7 +27,11 @@ conda activate harvest-tesseract
 
 export HARVEST_INPUT_PDF="$JOB_SCRATCH/0000765723_D0001.pdf"
 export HARVEST_RUN_DIR="$JOB_SCRATCH/run"
+export TESSDATA_PREFIX=${HARVEST_TESSDATA_DIR:-"$HOME/.local/share/harvest-tessdata"}
 export OMP_NUM_THREADS=${SLURM_CPUS_PER_TASK:-8}
+
+test -s "$TESSDATA_PREFIX/eng.traineddata"
+test -s "$TESSDATA_PREFIX/fra.traineddata"
 
 cd "$REPO_DIR"
 harvest-ocr --config "$CONFIG" run --model tesseract

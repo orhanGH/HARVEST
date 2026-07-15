@@ -1,5 +1,5 @@
 param(
-    [string]$ArchivePath = "$env:USERPROFILE\Downloads\HARVEST_OCR_implementation_v3.zip",
+    [string]$ArchivePath = "$env:USERPROFILE\Downloads\HARVEST_OCR_implementation_v4.zip",
     [string]$IdentityFile = "$env:USERPROFILE\.ssh\marvin_ed25519",
     [string]$Remote = "s6oraydi_hpc@marvin.hpc.uni-bonn.de"
 )
@@ -12,7 +12,7 @@ if (-not (Test-Path -LiteralPath $IdentityFile)) {
     throw "SSH key not found: $IdentityFile"
 }
 
-$RemoteArchive = "HARVEST_OCR_implementation_v3.zip"
+$RemoteArchive = "HARVEST_OCR_implementation_v4.zip"
 & scp -i $IdentityFile $ArchivePath "${Remote}:~/$RemoteArchive"
 if ($LASTEXITCODE -ne 0) { throw "SCP upload failed." }
 
@@ -25,7 +25,7 @@ if [ -d "$HOME/project_harvest/HARVEST" ]; then
     stamp=$(date +%Y%m%d_%H%M%S)
     mv "$HOME/project_harvest/HARVEST" "$HOME/project_harvest/_archive/HARVEST_$stamp"
 fi
-python -m zipfile -e "$HOME/HARVEST_OCR_implementation_v3.zip" "$HOME/project_harvest"
+python -m zipfile -e "$HOME/HARVEST_OCR_implementation_v4.zip" "$HOME/project_harvest"
 cd "$HOME/project_harvest/HARVEST"
 bash scripts/marvin/setup_tesseract.sh
 mkdir -p runs/slurm
