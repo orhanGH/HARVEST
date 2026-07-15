@@ -22,4 +22,4 @@ harvest-ocr --config "$CONFIG" layout
 harvest-ocr --config "$CONFIG" ocr --model tesseract
 harvest-ocr --config "$CONFIG" parse --model tesseract
 harvest-ocr --config "$CONFIG" validate --model tesseract
-
+harvest-ocr --config "$CONFIG" export --model tesseract
