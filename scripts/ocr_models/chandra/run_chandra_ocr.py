@@ -1,26 +1,28 @@
 #!/usr/bin/env python3
-"""
-Chandra OCR wrapper.
+"""Run Chandra OCR 2 on HARVEST table regions."""
 
-Goal:
-PNG images -> Markdown/JSON/HTML output.
+from __future__ import annotations
 
-Run only via GPU Slurm job.
-"""
 import argparse
 
-def main():
-    ap = argparse.ArgumentParser()
-    ap.add_argument("--image-dir", required=True)
-    ap.add_argument("--manifest", required=True)
-    ap.add_argument("--output-dir", required=True)
-    ap.add_argument("--limit", type=int, default=0)
-    args = ap.parse_args()
+from harvest_ocr.ocr.chandra import ChandraAdapter
 
-    raise SystemExit(
-        "TODO: implement Chandra wrapper after env/GPU smoke test. "
-        "This file is the clean location for it."
-    )
+
+def main() -> None:
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--manifest", "--regions-manifest", dest="manifest", required=True)
+    parser.add_argument("--output-dir", required=True)
+    parser.add_argument("--method", choices=("hf", "vllm"), default="hf")
+    parser.add_argument("--batch-size", type=int, default=1)
+    parser.add_argument("--max-workers", type=int, default=1)
+    parser.add_argument("--region-type", choices=("table", "row", "cell"), default="table")
+    parser.add_argument("--limit", type=int, default=0)
+    args = parser.parse_args()
+
+    adapter = ChandraAdapter(args.method, args.batch_size, args.max_workers)
+    output = adapter.run(args.manifest, args.output_dir, args.region_type, args.limit)
+    print(output)
+
 
 if __name__ == "__main__":
     main()
