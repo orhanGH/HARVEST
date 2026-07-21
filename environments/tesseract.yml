@@ -1,0 +1,8 @@
+name: harvest-tesseract
+channels:
+  - conda-forge
+dependencies:
+  - python=3.11
+  - pip
+  - curl
+  - tesseract>=5

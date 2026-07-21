@@ -1,25 +1,32 @@
 #!/usr/bin/env python3
-"""
-Surya OCR wrapper.
+"""Run Surya OCR 2 and table structure recognition."""
 
-Goal:
-PNG images -> OCR/layout/table output.
+from __future__ import annotations
 
-Try after Paddle and Chandra because Surya backend setup may be heavier.
-"""
 import argparse
 
-def main():
-    ap = argparse.ArgumentParser()
-    ap.add_argument("--image-dir", required=True)
-    ap.add_argument("--manifest", required=True)
-    ap.add_argument("--output-dir", required=True)
-    ap.add_argument("--limit", type=int, default=0)
-    args = ap.parse_args()
+from harvest_ocr.ocr.surya import SuryaAdapter
 
-    raise SystemExit(
-        "TODO: implement Surya wrapper after backend compatibility check."
+
+def main() -> None:
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--manifest", "--regions-manifest", dest="manifest", required=True)
+    parser.add_argument("--output-dir", required=True)
+    parser.add_argument("--region-type", choices=("table", "row", "cell"), default="table")
+    parser.add_argument("--limit", type=int, default=0)
+    parser.add_argument("--no-ocr", action="store_true")
+    parser.add_argument("--no-table", action="store_true")
+    parser.add_argument("--keep-server", action="store_true")
+    args = parser.parse_args()
+
+    adapter = SuryaAdapter(
+        run_ocr=not args.no_ocr,
+        run_table=not args.no_table,
+        keep_server=args.keep_server,
     )
+    output = adapter.run(args.manifest, args.output_dir, args.region_type, args.limit)
+    print(output)
+
 
 if __name__ == "__main__":
     main()

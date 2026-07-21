@@ -1,0 +1,122 @@
+project:
+  name: harvest_1926
+  run_dir: runs/harvest_1926
+
+input:
+  pdf: data/0000765723_D0001.pdf
+  # PDF page numbers are one-based. Tables 7-40 cover Wheat through Raw Silk.
+  pages: "44-83"
+
+preprocess:
+  crop_paper: true
+  crop_padding: 12
+  deskew: true
+  max_skew_degrees: 3.0
+  normalize_illumination: true
+  clahe_clip_limit: 2.0
+  threshold_method: otsu
+  threshold_block_size: 41
+  threshold_c: 13
+
+layout:
+  expected_columns:
+    - country_fr
+    - area_1925
+    - production_1925
+    - yield_1925
+    - country_en
+  # Only OCR the target-year cells; older-period columns are deliberately skipped.
+  column_ranges:
+    - [0.000, 0.185]  # French country name
+    - [0.320, 0.405]  # Area 1925 (third Area subcolumn)
+    - [0.575, 0.660]  # Production 1925 (third Production subcolumn)
+    - [0.795, 0.865]  # Yield 1925 (third Yield subcolumn)
+    - [0.850, 1.000]  # English country name; snaps to the printed boundary
+  # Production-only tables have different numbers of historical columns. The
+  # last numeric column is always the requested 1925 value.
+  page_profiles:
+    - pages: "60-64,69-71,77,83"
+      profile_id: production_7_periods
+      expected_columns: [country_fr, production_1925, country_en]
+      column_ranges: [[0.000, 0.205], [0.710, 0.810], [0.810, 1.000]]
+    - pages: "68,72-76"
+      profile_id: production_6_periods
+      expected_columns: [country_fr, production_1925, country_en]
+      column_ranges: [[0.000, 0.220], [0.700, 0.815], [0.815, 1.000]]
+    - pages: "82"
+      profile_id: production_5_periods
+      expected_columns: [country_fr, production_1925, country_en]
+      column_ranges: [[0.000, 0.260], [0.680, 0.815], [0.815, 1.000]]
+  min_table_width_ratio: 0.65
+  min_row_components: 2
+  row_merge_factor: 0.85
+  cell_padding: 4
+  save_debug_overlays: true
+
+ocr:
+  region_type: cell
+  tesseract:
+    languages: eng+fra
+    fallback_language: eng
+    scale: 2.0
+    country_psm: 7
+    numeric_psm: 7
+  paddle:
+    pipeline: table_recognition_v2
+    device: gpu
+    use_doc_orientation_classify: false
+    use_doc_unwarping: false
+  chandra:
+    method: hf
+    batch_size: 1
+    max_workers: 1
+  surya:
+    run_ocr: true
+    run_table: true
+    keep_server: false
+
+parser:
+  target_year: 1925
+  table_number_from_title: true
+  keep_empty_rows: false
+  export_per_product_csv: true
+  table_catalog:
+    - {pages: "44-45", table_number: "7", product_id: wheat, product_fr: Froment, product_en: Wheat, area_scale: 1000, production_scale: 1000}
+    - {pages: "46", table_number: "8", product_id: rye, product_fr: Seigle, product_en: Rye, area_scale: 1000, production_scale: 1000}
+    - {pages: "47-48", table_number: "9", product_id: barley, product_fr: Orge, product_en: Barley, area_scale: 1000, production_scale: 1000}
+    - {pages: "49", table_number: "10", product_id: oats, product_fr: Avoine, product_en: Oats, area_scale: 1000, production_scale: 1000}
+    - {pages: "50", table_number: "11", product_id: spelt, product_fr: Épeautre, product_en: Spelt, area_scale: 1000, production_scale: 1000}
+    - {pages: "51", table_number: "12", product_id: meslin, product_fr: Méteil, product_en: Meslin, area_scale: 1000, production_scale: 1000}
+    - {pages: "52-53", table_number: "13", product_id: maize, product_fr: Maïs, product_en: Maize, area_scale: 1000, production_scale: 1000}
+    - {pages: "54-55", table_number: "14", product_id: rice, product_fr: Riz, product_en: Rice, area_scale: 1000, production_scale: 1000}
+    - {pages: "56-57", table_number: "15", product_id: potatoes, product_fr: Pommes de terre, product_en: Potatoes, area_scale: 1000, production_scale: 1000}
+    - {pages: "58", table_number: "16", product_id: sugar_beet, product_fr: Betteraves à sucre, product_en: Sugar Beet, area_scale: 1000, production_scale: 1000}
+    - {pages: "59", table_number: "17", product_id: sugar_cane, product_fr: Canne à sucre, product_en: Sugar Cane, area_scale: 1000, production_scale: 1000}
+    - {pages: "60", table_number: "18", product_id: beet_sugar_raw, product_fr: Sucre de betterave brut, product_en: Beet Sugar Raw, production_scale: 1000}
+    - {pages: "61", table_number: "19", product_id: cane_sugar_raw, product_fr: Sucre de canne brut, product_en: Cane Sugar Raw, production_scale: 1000}
+    - {pages: "62", table_number: "20", product_id: coffee, product_fr: Café, product_en: Coffee, production_scale: 1000}
+    - {pages: "63", table_number: "21", product_id: cocoa_raw, product_fr: Cacao brut, product_en: Cocoa Raw, production_scale: 1000}
+    - {pages: "64", table_number: "22", product_id: tea, product_fr: Thé, product_en: Tea, production_scale: 1000}
+    - {pages: "65", table_number: "23", product_id: hops, product_fr: Houblon, product_en: Hops, area_scale: 1000, production_scale: 1000}
+    - {pages: "66-67", table_number: "24", product_id: tobacco, product_fr: Tabac, product_en: Tobacco, area_scale: 1000, production_scale: 1000}
+    - {pages: "68", table_number: "25", product_id: cottonseed, product_fr: Graines de coton, product_en: Cottonseed, production_scale: 1000}
+    - {pages: "69", table_number: "26", product_id: linseed, product_fr: Graines de lin, product_en: Linseed, production_scale: 1000}
+    - {pages: "70", table_number: "27", product_id: rapeseed, product_fr: Graines de colza, product_en: Rapeseed, production_scale: 1000}
+    - {pages: "71", table_number: "28", product_id: hempseed, product_fr: Graines de chanvre, product_en: Hempseed, production_scale: 1000}
+    - {pages: "72", table_number: "29", product_id: sesamum, product_fr: Sésame, product_en: Sesamum, production_scale: 1000}
+    - {pages: "73", table_number: "30", product_id: soya_beans, product_fr: Soja, product_en: Soya Beans, production_scale: 1000}
+    - {pages: "74", table_number: "31", product_id: groundnuts, product_fr: Arachides, product_en: Groundnuts, production_scale: 1000}
+    - {pages: "75", table_number: "32", product_id: copra, product_fr: Coprah, product_en: Copra, production_scale: 1000}
+    - {pages: "76", table_number: "33", product_id: palm_oil_raw, product_fr: Huile de palme et de noix de palme brute, product_en: Palm and Palm-kernel Oil Raw, production_scale: 1000}
+    - {pages: "77", table_number: "34", product_id: olive_oil_raw, product_fr: Huile d’olive brute, product_en: Olive Oil Raw, production_scale: 1000}
+    - {pages: "78", table_number: "35", product_id: cotton, product_fr: Cotonnier, product_en: Cotton, area_scale: 1000, production_scale: 1000}
+    - {pages: "79", table_number: "36", product_id: jute, product_fr: Jute, product_en: Jute, area_scale: 1000, production_scale: 1000}
+    - {pages: "80", table_number: "37", product_id: flax_fibre, product_fr: Lin filasse, product_en: Flax Fibre, area_scale: 1000, production_scale: 1000}
+    - {pages: "81", table_number: "38", product_id: hemp_fibre_manila, product_fr: Chanvre filasse et chanvre de Manille, product_en: Hemp Fibre and Manila Hemp, area_scale: 1000, production_scale: 1000}
+    - {pages: "82", table_number: "39", product_id: wool, product_fr: Laine, product_en: Wool, production_scale: 10000}
+    - {pages: "83", table_number: "40", product_id: raw_silk, product_fr: Soie grège, product_en: Raw Silk, production_scale: 10}
+
+validation:
+  yield_relative_tolerance: 0.18
+  yield_absolute_tolerance: 0.8
+  review_confidence_threshold: 0.75

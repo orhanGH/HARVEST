@@ -1,13 +1,15 @@
-# Chandra install idea
+# Chandra OCR 2 on Marvin
 
+```bash
 module purge
 module load Miniforge3
 eval "$(conda shell.bash hook)"
 conda create -n harvest-chandra python=3.11 -y
 conda activate harvest-chandra
-
 pip install -U pip
-pip install "chandra-ocr[hf]" pandas tqdm pillow beautifulsoup4 lxml
+pip install -e '.[base,chandra]'
+chandra --help
+```
 
-Use GPU Slurm job for inference.
-Do not run Chandra model inference on login node.
+Use `--method hf` for a self-contained smoke test. For production throughput, launch the official
+vLLM service and select `--method vllm`. Run inference only inside a GPU Slurm job.
