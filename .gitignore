@@ -5,8 +5,10 @@ __pycache__/
 .venv/
 .deps/
 tmp/
+
+# Local model downloads and run artifacts.
+models/
 runs/
 data/
-models/
 output/
 !output/.gitkeep

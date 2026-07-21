@@ -13,6 +13,10 @@ Each OCR wrapper should take PNG images and produce model-native raw outputs:
 
 The OCR model should not decide the final HARVEST values.
 
+The EfficientOCR branch follows the same rule: it recognizes pre-cropped cells
+and preserves their geometry metadata, while deterministic HARVEST code assigns
+cells to fields and creates the final rows.
+
 ## parsers/
 
 Dataset-specific deterministic parsers.
