@@ -38,3 +38,13 @@ new Surya backend may require vLLM on NVIDIA GPU or llama.cpp CPU backend.
 
 Folder:
 ocr_models/surya/
+
+## 5. EfficientOCR (Dell Research)
+
+Sample-efficient character/word localization plus image-retrieval recognition.
+Use it on geometry-defined HARVEST cell crops; it is not a table-structure
+parser. The adapter targets the maintained `efficient_ocr` package and
+pretrained English ONNX models.
+
+Folder:
+ocr_models/effocr/
