@@ -14,9 +14,11 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--config", default="configs/harvest_1926.yaml")
     commands = parser.add_subparsers(dest="command", required=True)
     for name in ("extract", "preprocess", "table-detection", "table-structure"):
-        commands.add_parser(name)
+        command = commands.add_parser(name)
+        command.add_argument("--config", default=argparse.SUPPRESS)
     for name in ("validate", "export"):
         command = commands.add_parser(name)
+        command.add_argument("--config", default=argparse.SUPPRESS)
         command.add_argument("--model", choices=MODELS, required=True)
     return parser
 
