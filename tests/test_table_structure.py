@@ -25,4 +25,5 @@ def test_structure_extracts_provenance_geometry_only():
     assert all(not hasattr(cell, "text") for cell in cells)
     assert all(column.semantic_name is None for column in columns)
     assert cells[0].to_dict()["cell_id"] == cells[0].cell_id
+    assert type(cells[0])(**cells[0].to_dict()) == cells[0]
     assert all(cell.row_index < len(rows) and cell.column_index < len(columns) for cell in cells)

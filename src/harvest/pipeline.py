@@ -7,20 +7,15 @@ from .modules.table_detection import LegacyOpenCVTableDetector
 from .modules.table_structure import LegacyRulesTableStructureRecognizer
 from .paths import RunPaths
 from .types import DetectedTable
-from .utils import HarvestError, parse_page_range, read_jsonl, write_jsonl
-
-
-def _load_config(path: str | Path) -> dict[str, Any]:
-    from harvest_ocr.utils import load_config
-    return load_config(path)
+from .utils import HarvestError, load_config, parse_page_range, read_jsonl, resolve_project_path, write_jsonl
 
 
 class HarvestPipeline:
     """Modular geometry stages over the existing preprocessing artifacts."""
 
     def __init__(self, config_path: str | Path) -> None:
-        self.config = _load_config(config_path)
-        self.paths = RunPaths(Path(self.config["project"]["run_dir"]))
+        self.config = load_config(config_path)
+        self.paths = RunPaths(resolve_project_path(self.config, self.config["project"]["run_dir"]))
 
     @staticmethod
     def _page_settings(settings: dict[str, Any], page_number: int) -> dict[str, Any]:
