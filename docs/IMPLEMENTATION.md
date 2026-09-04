@@ -1,5 +1,12 @@
 # HARVEST implementation notes
 
+## Table localization boundaries
+
+EfficientOCR localization is character/glyph localization internal to its OCR model.
+HARVEST `table_detection` is page-level localization that identifies table regions.
+HARVEST `table_structure` then derives row, column, and cell geometry inside an already
+detected region; it does not assign OCR text or semantic column meanings.
+
 ## Stable interfaces
 
 Every processing stage writes a JSONL manifest and never overwrites the preceding stage. Model
