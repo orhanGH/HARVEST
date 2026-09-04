@@ -39,6 +39,8 @@ class TableRegion:
 
 @dataclass(slots=True)
 class LogicalTable:
+    """Pure geometric grouping; title and table number are optional interpretation metadata."""
+
     logical_table_id: str
     document_id: str
     table_region_ids: list[str]
