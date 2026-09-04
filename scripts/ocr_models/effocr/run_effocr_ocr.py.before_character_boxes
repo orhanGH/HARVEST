@@ -128,70 +128,17 @@ def compact_predictions(preds: Any) -> list[dict[str, Any]]:
     """Keep useful text geometry while excluding image arrays from EffOCR output."""
     if not isinstance(preds, dict):
         return []
-
     lines: list[dict[str, Any]] = []
-
     for line_id in sorted(preds, key=lambda value: int(value)):
         line = preds[line_id]
         item: dict[str, Any] = {"line_id": int(line_id)}
-
-        line_bbox = None
         if line.get("bbox") is not None:
-            line_bbox = [int(value) for value in line["bbox"]]
-            item["bbox"] = line_bbox
-            item["bbox_order"] = "y0_x0_y1_x1"
-
+            item["bbox"] = [int(value) for value in line["bbox"]]
         if line.get("word_preds") is not None:
-            item["words"] = [
-                "" if value is None else str(value)
-                for value in line["word_preds"]
-            ]
-
-        character_text = str(line.get("char_preds") or "")
-        item["characters"] = character_text
-
-        character_details: list[dict[str, Any]] = []
-
-        for index, character in enumerate(line.get("chars") or []):
-            if not isinstance(character, (tuple, list)) or len(character) < 2:
-                continue
-
-            raw_bbox = character[1]
-            if raw_bbox is None:
-                continue
-
-            line_relative_bbox = [int(value) for value in raw_bbox]
-
-            detail: dict[str, Any] = {
-                "index": index,
-                "prediction": (
-                    character_text[index]
-                    if index < len(character_text)
-                    else None
-                ),
-                "bbox_yxyx_line": line_relative_bbox,
-            }
-
-            if line_bbox is not None and len(line_relative_bbox) == 4:
-                line_y0, line_x0, _, _ = line_bbox
-                char_y0, char_x0, char_y1, char_x1 = line_relative_bbox
-
-                detail["bbox_yxyx_cell"] = [
-                    line_y0 + char_y0,
-                    line_x0 + char_x0,
-                    line_y0 + char_y1,
-                    line_x0 + char_x1,
-                ]
-
-            character_details.append(detail)
-
-        item["character_details"] = character_details
-        item["character_count_mismatch"] = (
-            len(character_text) != len(character_details)
-        )
-
+            item["words"] = ["" if value is None else str(value) for value in line["word_preds"]]
+        if line.get("char_preds") is not None:
+            item["characters"] = str(line["char_preds"])
         lines.append(item)
-
     return lines
 
 

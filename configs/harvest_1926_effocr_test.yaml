@@ -1,0 +1,75 @@
+project:
+  name: harvest_1926_effocr_test_rye
+  run_dir: runs/effocr_test_rye_page46_v2
+input:
+  pdf: /lustre/scratch/data/s6oraydi_hpc-project_harvest/s6oraydi_work/old/test_data/1/0000765723_D0001-46.pdf
+  pages: '1'
+preprocess:
+  crop_paper: true
+  crop_padding: 12
+  deskew: true
+  max_skew_degrees: 3.0
+  normalize_illumination: true
+  clahe_clip_limit: 2.0
+  threshold_method: otsu
+  threshold_block_size: 41
+  threshold_c: 13
+layout:
+  expected_columns:
+  - area_1925
+  - production_1925
+  - yield_1925
+  - country_en
+  column_ranges:
+  - - 0.32
+    - 0.405
+  - - 0.575
+    - 0.66
+  - - 0.795
+    - 0.865
+  - - 0.85
+    - 1.0
+  page_profiles: []
+  min_table_width_ratio: 0.65
+  min_row_components: 2
+  row_merge_factor: 0.85
+  cell_padding: 4
+  save_debug_overlays: true
+ocr:
+  region_type: cell
+  tesseract:
+    languages: eng+fra
+    fallback_language: eng
+    scale: 2.0
+    country_psm: 7
+    numeric_psm: 7
+  paddle:
+    pipeline: table_recognition_v2
+    device: gpu
+    use_doc_orientation_classify: false
+    use_doc_unwarping: false
+  chandra:
+    method: hf
+    batch_size: 1
+    max_workers: 1
+  surya:
+    run_ocr: true
+    run_table: true
+    keep_server: false
+parser:
+  target_year: 1925
+  table_number_from_title: true
+  keep_empty_rows: false
+  export_per_product_csv: true
+  table_catalog:
+  - pages: '1'
+    table_number: '8'
+    product_id: rye
+    product_fr: Seigle
+    product_en: Rye
+    area_scale: 1000
+    production_scale: 1000
+validation:
+  yield_relative_tolerance: 0.18
+  yield_absolute_tolerance: 0.8
+  review_confidence_threshold: 0.75

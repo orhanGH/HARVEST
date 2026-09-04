@@ -1,8 +1,10 @@
 #!/bin/bash
 #SBATCH --job-name=harvest_effocr
-#SBATCH --cpus-per-task=8
-#SBATCH --mem=32G
-#SBATCH --time=04:00:00
+#SBATCH --account=ag_ilr_wuepper
+#SBATCH --partition=intelsr_devel
+#SBATCH --cpus-per-task=4
+#SBATCH --mem=16G
+#SBATCH --time=00:30:00
 #SBATCH --output=runs/slurm/%x_%j.out
 #SBATCH --error=runs/slurm/%x_%j.err
 
@@ -18,6 +20,7 @@ module purge
 module load Miniforge3
 eval "$(conda shell.bash hook)"
 conda activate harvest-effocr
+export PYTHONNOUSERSITE=1
 
 python scripts/ocr_models/effocr/run_effocr_ocr.py \
   --regions-manifest "$REGIONS" \

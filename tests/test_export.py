@@ -39,7 +39,6 @@ def test_product_export_has_exact_schema_and_blank_missing_fields(tmp_path):
     assert rows == [
         {
             "country_name_english": "Japan",
-            "country_name_french": "Japon",
             "area_hectares_1925": "",
             "production_quintals_1925": "12340",
             "yield_per_hectare_1925": "",

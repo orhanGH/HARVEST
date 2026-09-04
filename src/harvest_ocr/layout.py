@@ -215,6 +215,15 @@ def _detect_rows(
     if not filtered:
         return []
 
+    # Superscripts, footnote markers, and touching glyphs can produce two
+    # nearby projection bands for one printed row. Merge only centers that
+    # are substantially closer than the page's typical row spacing.
+    if len(filtered) > 1:
+        center_gaps = np.diff(filtered)
+        typical_spacing = float(np.median(center_gaps))
+        center_merge_distance = max(2, int(round(typical_spacing * 0.65)))
+        filtered = _cluster_positions(filtered, center_merge_distance)
+
     boundaries: list[tuple[int, int]] = []
     for index, center in enumerate(filtered):
         previous = filtered[index - 1] if index else header_bottom

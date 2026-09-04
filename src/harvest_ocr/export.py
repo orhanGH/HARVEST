@@ -10,7 +10,6 @@ from .utils import read_jsonl, safe_stem
 
 OUTPUT_COLUMNS = [
     "country_name_english",
-    "country_name_french",
     "area_hectares_1925",
     "production_quintals_1925",
     "yield_per_hectare_1925",
@@ -29,7 +28,7 @@ def export_product_csvs(
     output_dir: str | Path,
     table_catalog: list[dict[str, Any]],
 ) -> Path:
-    """Write one stable five-column CSV per product, including empty products."""
+    """Write one stable four-column CSV per product, including empty products."""
     target = Path(output_dir).resolve()
     target.mkdir(parents=True, exist_ok=True)
     grouped: dict[str, list[dict[str, Any]]] = defaultdict(list)
@@ -51,7 +50,6 @@ def export_product_csvs(
                 writer.writerow(
                     {
                         "country_name_english": record.get("country_en", ""),
-                        "country_name_french": record.get("country_fr", ""),
                         "area_hectares_1925": _display_number(record.get("area_1925")),
                         "production_quintals_1925": _display_number(record.get("production_1925")),
                         "yield_per_hectare_1925": _display_number(record.get("yield_1925")),
