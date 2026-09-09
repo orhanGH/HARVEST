@@ -139,7 +139,6 @@ def compact_predictions(preds: Any) -> list[dict[str, Any]]:
         if line.get("bbox") is not None:
             line_bbox = [int(value) for value in line["bbox"]]
             item["bbox"] = line_bbox
-            item["bbox_order"] = "y0_x0_y1_x1"
 
         if line.get("word_preds") is not None:
             item["words"] = [
@@ -148,8 +147,6 @@ def compact_predictions(preds: Any) -> list[dict[str, Any]]:
             ]
 
         character_text = str(line.get("char_preds") or "")
-        item["characters"] = character_text
-
         character_details: list[dict[str, Any]] = []
 
         for index, character in enumerate(line.get("chars") or []):
@@ -185,10 +182,14 @@ def compact_predictions(preds: Any) -> list[dict[str, Any]]:
 
             character_details.append(detail)
 
-        item["character_details"] = character_details
-        item["character_count_mismatch"] = (
-            len(character_text) != len(character_details)
-        )
+        if character_text or character_details:
+            if line_bbox is not None:
+                item["bbox_order"] = "y0_x0_y1_x1"
+            item["characters"] = character_text
+            item["character_details"] = character_details
+            item["character_count_mismatch"] = (
+                len(character_text) != len(character_details)
+            )
 
         lines.append(item)
 
