@@ -74,6 +74,19 @@ def test_match_detections_is_one_to_one():
     assert matches[1].annotation_index == 1
 
 
+def test_match_detections_treats_table_rotated_as_table_for_localization():
+    predictions = [
+        DetectionRecord(pdf_page=20, bbox=(10, 10, 50, 50), label="table rotated", score=0.9),
+    ]
+    annotations = [
+        DetectionRecord(pdf_page=20, bbox=(10, 10, 50, 50), label="table"),
+    ]
+    matches = match_detections(predictions, annotations, iou_threshold=0.5)
+    assert len(matches) == 1
+    assert matches[0].prediction.label == "table rotated"
+    assert matches[0].to_dict()["prediction"]["label"] == "table rotated"
+
+
 def test_evaluate_detections_handles_empty_inputs():
     summary = evaluate_detections([], [], iou_threshold=0.5)
     assert summary.true_positives == 0
@@ -108,6 +121,20 @@ def test_evaluate_detections_reports_per_page_totals():
     assert summary.pages[0].false_positives == 1
     assert summary.pages[1].pdf_page == 21
     assert summary.pages[1].false_negatives == 1
+
+
+def test_evaluate_detections_treats_table_rotated_as_table_for_localization():
+    predictions = [
+        DetectionRecord(pdf_page=20, bbox=(10, 10, 50, 50), label="table rotated", score=0.9),
+    ]
+    annotations = [
+        DetectionRecord(pdf_page=20, bbox=(10, 10, 50, 50), label="table"),
+    ]
+    summary = evaluate_detections(predictions, annotations, iou_threshold=0.5)
+    assert summary.true_positives == 1
+    assert summary.false_positives == 0
+    assert summary.false_negatives == 0
+    assert summary.pages[0].true_positives == 1
 
 
 def test_load_annotations_supports_json_page_records(tmp_path):

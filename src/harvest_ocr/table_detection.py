@@ -242,7 +242,9 @@ def match_detections(
     candidates: list[tuple[float, int, int]] = []
     for prediction_index, prediction in enumerate(predictions):
         for annotation_index, annotation in enumerate(annotations):
-            if prediction.pdf_page != annotation.pdf_page or prediction.label != annotation.label:
+            if prediction.pdf_page != annotation.pdf_page:
+                continue
+            if _localization_label(prediction.label) != _localization_label(annotation.label):
                 continue
             score = bbox_iou(prediction.bbox, annotation.bbox)
             if score >= iou_threshold:
@@ -459,6 +461,13 @@ def _sort_score(score: float | None) -> float:
     if score is None:
         return 0.0
     return float(score)
+
+
+def _localization_label(label: str) -> str:
+    normalized = label.strip().casefold()
+    if normalized in {"table", "table rotated"}:
+        return "table"
+    return normalized
 
 
 __all__ = [

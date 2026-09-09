@@ -18,8 +18,8 @@ Do **not** commit source PDF pages, rendered PNGs, or ad-hoc run outputs here.
 - `table`
 - `table rotated`
 
-Keep labels exact. Evaluation matches predictions and annotations only when both the page number and
-label agree.
+Keep raw labels exact in annotations and detector outputs. For localization evaluation, `table` and
+`table rotated` are treated as equivalent when page number and IoU criteria match.
 
 ## Page-oriented format
 
