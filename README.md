@@ -29,6 +29,14 @@ Tesseract itself and the `eng`/`fra` language packs are system dependencies. The
 models are intentionally optional because they require separate, frequently incompatible GPU
 environments.
 
+For the optional Table Transformer detector baseline, install the PyTorch build that matches your
+CPU/CUDA environment first, then install Transformers in that same environment:
+
+```bash
+pip install -e '.[dev]'
+pip install 'transformers>=4.39'
+```
+
 ## End-to-end Tesseract baseline
 
 Copy the PDF to `data/0000765723_D0001.pdf`, then run:
@@ -90,15 +98,64 @@ harvest-ocr --config configs/harvest_1926.yaml benchmark \
 The report includes row coverage, exact numeric-cell accuracy, per-field accuracy, and country
 label similarity. A value recognized perfectly in the wrong column is counted as wrong.
 
+## Table Transformer table-detection baseline
+
+The detector baseline lives in `scripts/table_detection/detect_tables_pdf.py` and keeps bbox,
+matching, annotation loading, and evaluation utilities in `src/harvest_ocr/table_detection.py`.
+The successful baseline settings were:
+
+- model: `microsoft/table-transformer-detection`
+- labels kept: `table`, `table rotated`
+- pages: `20-45`
+- DPI: `180`
+- confidence threshold: `0.50`
+
+Example run:
+
+```bash
+python scripts/table_detection/detect_tables_pdf.py \
+  --pdf /absolute/path/to/0000765723_D0001.pdf \
+  --pages 20-45 \
+  --dpi 180 \
+  --threshold 0.50 \
+  --bbox-padding 8
+```
+
+Optional flags:
+
+- `--output-dir` to choose the run directory;
+- `--device auto|cpu|cuda|cuda:0|mps`;
+- `--annotations annotations/table_detection/labels.jsonl` to compute IoU-based evaluation against
+  manual labels;
+- `--save-page-renders` to retain rendered PNG pages for review.
+
+Each run writes:
+
+- `pages.jsonl`: one page record with image dimensions and kept detections;
+- `detections.jsonl`: one normalized detection per table with `bbox` and padded `crop_bbox`;
+- `summary.json`: run configuration, pages processed, counts before/after overlap filtering, and
+  optional evaluation results;
+- `evaluation.json`: precision/recall/mean-IoU summary when annotations are supplied.
+
+Predictions are filtered to `table` and `table rotated`, clipped to image bounds, optionally padded
+for safer downstream crops, and deduplicated deterministically before export.
+
+See `annotations/table_detection/README.md` for the manual-label schema and evaluation workflow.
+Keep generated page PNGs, PDFs, Hugging Face caches, and run outputs out of Git by using a path
+under `runs/` (already ignored) or a directory outside the repository.
+
 ## Repository layout
 
 ```text
 configs/                     document and table-layout configuration
+annotations/table_detection/ manual table-detection labels and format notes
 src/harvest_ocr/             reusable Python package
+scripts/table_detection/     Table Transformer detector CLI
 scripts/ocr_models/          model-specific command wrappers
 scripts/pipeline/            repository-local pipeline entry point
 scripts/postprocess/         validation helper
 scripts/slurm/               Marvin CPU/GPU job templates
+scripts/slurm/table_detection/ Slurm launcher for Table Transformer runs
 tests/                       parser, validation, and layout tests
 ```
 
