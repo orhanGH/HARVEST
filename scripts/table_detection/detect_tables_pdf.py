@@ -161,8 +161,8 @@ def run_detection(args: argparse.Namespace) -> dict[str, Any]:
             )
             raw_prediction_count += len(page_predictions)
             page_predictions = filter_labels(page_predictions, TABLE_LABELS)
-            edge_filter_input_count += len(page_predictions)
             if args.edge_artifact_filter:
+                edge_filter_input_count += len(page_predictions)
                 filtered_predictions = filter_scan_edge_artifacts(
                     page_predictions,
                     edge_margin_px=args.edge_margin_px,
