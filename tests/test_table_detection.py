@@ -104,6 +104,21 @@ def test_filter_scan_edge_artifacts_keeps_wide_table_touching_left_edge():
     assert kept[0].bbox == (1.0, 50.0, 240.0, 500.0)
 
 
+def test_filter_scan_edge_artifacts_removes_box_at_width_ratio_threshold():
+    detections = [
+        DetectionRecord(
+            pdf_page=29,
+            bbox=(3, 50, 53, 500),
+            label="table",
+            score=0.8,
+            image_width=1000,
+            image_height=1400,
+        )
+    ]
+    kept = filter_scan_edge_artifacts(detections, edge_max_width_ratio=0.05)
+    assert kept == []
+
+
 def test_filter_scan_edge_artifacts_keeps_normal_table_detection():
     detections = [
         DetectionRecord(

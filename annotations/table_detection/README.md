@@ -80,7 +80,7 @@ The run writes:
 
 Post-processing includes a conservative scan-edge artifact filter (enabled by default): a detection
 is removed only when its left edge is within `edge_margin_px` pixels of the page boundary (default
-`5`) **and** `bbox_width / image_width` is below `edge_max_width_ratio` (default `0.05`). Use
+`5`) **and** `bbox_width / image_width` is at or below `edge_max_width_ratio` (default `0.05`). Use
 `--no-edge-artifact-filter` to disable it.
 
 Mean IoU is computed over matched prediction/annotation pairs only, and is reported as `0.0` when

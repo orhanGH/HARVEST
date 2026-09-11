@@ -396,7 +396,7 @@ def filter_scan_edge_artifacts(
             continue
         x0, _, x1, _ = detection.bbox
         width_ratio = (x1 - x0) / float(detection.image_width)
-        if x0 <= margin and width_ratio < max_width_ratio:
+        if x0 <= margin and width_ratio <= max_width_ratio:
             continue
         kept.append(detection)
     return kept
