@@ -374,6 +374,34 @@ def filter_labels(
     return [detection for detection in detections if detection.label.casefold() in allowed]
 
 
+def filter_scan_edge_artifacts(
+    detections: Iterable[DetectionRecord],
+    *,
+    edge_margin_px: float = 5.0,
+    edge_max_width_ratio: float = 0.05,
+) -> list[DetectionRecord]:
+    """Remove narrow detections hugging the left page boundary."""
+
+    margin = float(edge_margin_px)
+    max_width_ratio = float(edge_max_width_ratio)
+    if margin < 0:
+        raise HarvestError(f"edge_margin_px must be >= 0, got {edge_margin_px}")
+    if max_width_ratio < 0:
+        raise HarvestError(f"edge_max_width_ratio must be >= 0, got {edge_max_width_ratio}")
+
+    kept: list[DetectionRecord] = []
+    for detection in detections:
+        if detection.image_width is None or detection.image_width <= 0:
+            kept.append(detection)
+            continue
+        x0, _, x1, _ = detection.bbox
+        width_ratio = (x1 - x0) / float(detection.image_width)
+        if x0 <= margin and width_ratio < max_width_ratio:
+            continue
+        kept.append(detection)
+    return kept
+
+
 def _annotation_rows_to_detections(row: Any, source_path: Path) -> list[DetectionRecord]:
     if not isinstance(row, dict):
         raise HarvestError(f"Annotation rows in {source_path} must be JSON objects")
@@ -481,6 +509,7 @@ __all__ = [
     "bbox_iou",
     "clip_bbox",
     "evaluate_detections",
+    "filter_scan_edge_artifacts",
     "filter_labels",
     "intersection_area",
     "intersection_bbox",

@@ -8,6 +8,7 @@ from harvest_ocr.table_detection import (
     bbox_iou,
     clip_bbox,
     evaluate_detections,
+    filter_scan_edge_artifacts,
     load_annotations,
     match_detections,
     normalize_bbox,
@@ -54,6 +55,69 @@ def test_suppress_overlapping_detections_keeps_highest_score():
     kept = suppress_overlapping_detections(detections, iou_threshold=0.9, overlap_threshold=0.8)
     assert [record.label for record in kept] == ["table", "table rotated", "table"]
     assert [round(record.score or 0.0, 2) for record in kept] == [0.95, 0.9, 0.7]
+
+
+def test_filter_scan_edge_artifacts_removes_narrow_left_edge_strip():
+    detections = [
+        DetectionRecord(
+            pdf_page=25,
+            bbox=(2, 50, 40, 500),
+            label="table",
+            score=0.8,
+            image_width=1000,
+            image_height=1400,
+        )
+    ]
+    kept = filter_scan_edge_artifacts(detections)
+    assert kept == []
+
+
+def test_filter_scan_edge_artifacts_keeps_narrow_box_away_from_left_edge():
+    detections = [
+        DetectionRecord(
+            pdf_page=27,
+            bbox=(20, 50, 58, 500),
+            label="table",
+            score=0.8,
+            image_width=1000,
+            image_height=1400,
+        )
+    ]
+    kept = filter_scan_edge_artifacts(detections)
+    assert len(kept) == 1
+    assert kept[0].bbox == (20.0, 50.0, 58.0, 500.0)
+
+
+def test_filter_scan_edge_artifacts_keeps_wide_table_touching_left_edge():
+    detections = [
+        DetectionRecord(
+            pdf_page=29,
+            bbox=(1, 50, 240, 500),
+            label="table",
+            score=0.8,
+            image_width=1000,
+            image_height=1400,
+        )
+    ]
+    kept = filter_scan_edge_artifacts(detections)
+    assert len(kept) == 1
+    assert kept[0].bbox == (1.0, 50.0, 240.0, 500.0)
+
+
+def test_filter_scan_edge_artifacts_keeps_normal_table_detection():
+    detections = [
+        DetectionRecord(
+            pdf_page=31,
+            bbox=(120, 80, 780, 950),
+            label="table",
+            score=0.9,
+            image_width=1000,
+            image_height=1400,
+        )
+    ]
+    kept = filter_scan_edge_artifacts(detections)
+    assert len(kept) == 1
+    assert kept[0].bbox == (120.0, 80.0, 780.0, 950.0)
 
 
 def test_match_detections_is_one_to_one():
