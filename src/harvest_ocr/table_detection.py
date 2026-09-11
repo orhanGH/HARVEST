@@ -386,8 +386,8 @@ def filter_scan_edge_artifacts(
     max_width_ratio = float(edge_max_width_ratio)
     if margin < 0:
         raise HarvestError(f"edge_margin_px must be >= 0, got {edge_margin_px}")
-    if max_width_ratio < 0:
-        raise HarvestError(f"edge_max_width_ratio must be >= 0, got {edge_max_width_ratio}")
+    if max_width_ratio < 0 or max_width_ratio > 1:
+        raise HarvestError(f"edge_max_width_ratio must be between 0 and 1, got {edge_max_width_ratio}")
 
     kept: list[DetectionRecord] = []
     for detection in detections:

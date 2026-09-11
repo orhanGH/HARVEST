@@ -120,6 +120,37 @@ def test_filter_scan_edge_artifacts_keeps_normal_table_detection():
     assert kept[0].bbox == (120.0, 80.0, 780.0, 950.0)
 
 
+def test_filter_scan_edge_artifacts_rejects_negative_edge_margin():
+    detections = [
+        DetectionRecord(
+            pdf_page=31,
+            bbox=(120, 80, 780, 950),
+            label="table",
+            score=0.9,
+            image_width=1000,
+            image_height=1400,
+        )
+    ]
+    with pytest.raises(HarvestError):
+        filter_scan_edge_artifacts(detections, edge_margin_px=-1)
+
+
+@pytest.mark.parametrize("ratio", [-0.1, 1.1])
+def test_filter_scan_edge_artifacts_rejects_out_of_range_width_ratio(ratio):
+    detections = [
+        DetectionRecord(
+            pdf_page=31,
+            bbox=(120, 80, 780, 950),
+            label="table",
+            score=0.9,
+            image_width=1000,
+            image_height=1400,
+        )
+    ]
+    with pytest.raises(HarvestError):
+        filter_scan_edge_artifacts(detections, edge_max_width_ratio=ratio)
+
+
 def test_match_detections_is_one_to_one():
     predictions = [
         DetectionRecord(pdf_page=20, bbox=(10, 10, 50, 50), label="table", score=0.9),
