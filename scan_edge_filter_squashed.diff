@@ -1,0 +1,280 @@
+diff --git a/annotations/table_detection/README.md b/annotations/table_detection/README.md
+index 2da56f2..76eba07 100644
+--- a/annotations/table_detection/README.md
++++ b/annotations/table_detection/README.md
+@@ -78,5 +78,10 @@ The run writes:
+ - `evaluation.json`: true positives, false positives, false negatives, precision, recall, mean IoU,
+   and per-page totals when annotations are supplied.
+ 
++Post-processing includes a conservative scan-edge artifact filter (enabled by default): a detection
++is removed only when its left edge is within `edge_margin_px` pixels of the page boundary (default
++`5`) **and** `bbox_width / image_width` is at or below `edge_max_width_ratio` (default `0.05`). Use
++`--no-edge-artifact-filter` to disable it.
++
+ Mean IoU is computed over matched prediction/annotation pairs only, and is reported as `0.0` when
+ no matches are found.
+diff --git a/scripts/table_detection/detect_tables_pdf.py b/scripts/table_detection/detect_tables_pdf.py
+index 2939206..670b7f4 100755
+--- a/scripts/table_detection/detect_tables_pdf.py
++++ b/scripts/table_detection/detect_tables_pdf.py
+@@ -16,6 +16,7 @@ from harvest_ocr.table_detection import (
+     DetectionRecord,
+     clip_bbox,
+     evaluate_detections,
++    filter_scan_edge_artifacts,
+     filter_labels,
+     load_annotations,
+     pad_bbox,
+@@ -72,6 +73,32 @@ def build_parser() -> argparse.ArgumentParser:
+         default=0.5,
+         help="IoU threshold for prediction/annotation matching",
+     )
++    edge_filter_group = parser.add_mutually_exclusive_group()
++    edge_filter_group.add_argument(
++        "--edge-artifact-filter",
++        dest="edge_artifact_filter",
++        action="store_true",
++        help="Filter narrow detections touching the left page boundary",
++    )
++    edge_filter_group.add_argument(
++        "--no-edge-artifact-filter",
++        dest="edge_artifact_filter",
++        action="store_false",
++        help="Disable left-edge artifact filtering",
++    )
++    parser.set_defaults(edge_artifact_filter=True)
++    parser.add_argument(
++        "--edge-margin-px",
++        type=float,
++        default=5.0,
++        help="Left-page margin in pixels used for edge artifact filtering",
++    )
++    parser.add_argument(
++        "--edge-max-width-ratio",
++        type=float,
++        default=0.05,
++        help="Maximum bbox_width/image_width ratio to treat as an edge artifact",
++    )
+     parser.add_argument(
+         "--save-page-renders",
+         action="store_true",
+@@ -106,6 +133,8 @@ def run_detection(args: argparse.Namespace) -> dict[str, Any]:
+     detections: list[DetectionRecord] = []
+     pages_payload: list[dict[str, Any]] = []
+     raw_prediction_count = 0
++    edge_filter_input_count = 0
++    edge_filter_removed_count = 0
+ 
+     with fitz.open(pdf_path) as document:
+         pages = parse_page_range(args.pages, document.page_count)
+@@ -132,6 +161,15 @@ def run_detection(args: argparse.Namespace) -> dict[str, Any]:
+             )
+             raw_prediction_count += len(page_predictions)
+             page_predictions = filter_labels(page_predictions, TABLE_LABELS)
++            if args.edge_artifact_filter:
++                edge_filter_input_count += len(page_predictions)
++                filtered_predictions = filter_scan_edge_artifacts(
++                    page_predictions,
++                    edge_margin_px=args.edge_margin_px,
++                    edge_max_width_ratio=args.edge_max_width_ratio,
++                )
++                edge_filter_removed_count += len(page_predictions) - len(filtered_predictions)
++                page_predictions = filtered_predictions
+             page_predictions = suppress_overlapping_detections(
+                 page_predictions,
+                 iou_threshold=args.duplicate_iou_threshold,
+@@ -178,12 +216,19 @@ def run_detection(args: argparse.Namespace) -> dict[str, Any]:
+         "page_count": len(pages),
+         "pages_with_predictions": sum(1 for page in pages_payload if page["detection_count"] > 0),
+         "detections_before_filtering": raw_prediction_count,
++        "detections_before_edge_filtering": edge_filter_input_count,
++        "detections_removed_by_edge_filtering": edge_filter_removed_count,
+         "detections_after_filtering": len(detection_rows),
+         "label_counts": dict(sorted(label_counts.items())),
+         "threshold": args.threshold,
+         "dpi": args.dpi,
+         "bbox_padding": args.bbox_padding,
+         "kept_labels": list(TABLE_LABELS),
++        "edge_artifact_filter": {
++            "enabled": bool(args.edge_artifact_filter),
++            "edge_margin_px": args.edge_margin_px,
++            "edge_max_width_ratio": args.edge_max_width_ratio,
++        },
+         "artifacts": {
+             "pages_jsonl": str(output_dir / "pages.jsonl"),
+             "detections_jsonl": str(output_dir / "detections.jsonl"),
+diff --git a/src/harvest_ocr/table_detection.py b/src/harvest_ocr/table_detection.py
+index 280527d..37dbde0 100644
+--- a/src/harvest_ocr/table_detection.py
++++ b/src/harvest_ocr/table_detection.py
+@@ -374,6 +374,34 @@ def filter_labels(
+     return [detection for detection in detections if detection.label.casefold() in allowed]
+ 
+ 
++def filter_scan_edge_artifacts(
++    detections: Iterable[DetectionRecord],
++    *,
++    edge_margin_px: float = 5.0,
++    edge_max_width_ratio: float = 0.05,
++) -> list[DetectionRecord]:
++    """Remove narrow detections hugging the left page boundary."""
++
++    margin = float(edge_margin_px)
++    max_width_ratio = float(edge_max_width_ratio)
++    if margin < 0:
++        raise HarvestError(f"edge_margin_px must be >= 0, got {edge_margin_px}")
++    if max_width_ratio < 0 or max_width_ratio > 1:
++        raise HarvestError(f"edge_max_width_ratio must be between 0 and 1, got {edge_max_width_ratio}")
++
++    kept: list[DetectionRecord] = []
++    for detection in detections:
++        if detection.image_width is None or detection.image_width <= 0:
++            kept.append(detection)
++            continue
++        x0, _, x1, _ = detection.bbox
++        width_ratio = (x1 - x0) / float(detection.image_width)
++        if x0 <= margin and width_ratio <= max_width_ratio:
++            continue
++        kept.append(detection)
++    return kept
++
++
+ def _annotation_rows_to_detections(row: Any, source_path: Path) -> list[DetectionRecord]:
+     if not isinstance(row, dict):
+         raise HarvestError(f"Annotation rows in {source_path} must be JSON objects")
+@@ -481,6 +509,7 @@ __all__ = [
+     "bbox_iou",
+     "clip_bbox",
+     "evaluate_detections",
++    "filter_scan_edge_artifacts",
+     "filter_labels",
+     "intersection_area",
+     "intersection_bbox",
+diff --git a/tests/test_table_detection.py b/tests/test_table_detection.py
+index 5ff213f..dd9ab6b 100644
+--- a/tests/test_table_detection.py
++++ b/tests/test_table_detection.py
+@@ -8,6 +8,7 @@ from harvest_ocr.table_detection import (
+     bbox_iou,
+     clip_bbox,
+     evaluate_detections,
++    filter_scan_edge_artifacts,
+     load_annotations,
+     match_detections,
+     normalize_bbox,
+@@ -56,6 +57,115 @@ def test_suppress_overlapping_detections_keeps_highest_score():
+     assert [round(record.score or 0.0, 2) for record in kept] == [0.95, 0.9, 0.7]
+ 
+ 
++def test_filter_scan_edge_artifacts_removes_narrow_left_edge_strip():
++    detections = [
++        DetectionRecord(
++            pdf_page=25,
++            bbox=(2, 50, 40, 500),
++            label="table",
++            score=0.8,
++            image_width=1000,
++            image_height=1400,
++        )
++    ]
++    kept = filter_scan_edge_artifacts(detections)
++    assert kept == []
++
++
++def test_filter_scan_edge_artifacts_keeps_narrow_box_away_from_left_edge():
++    detections = [
++        DetectionRecord(
++            pdf_page=27,
++            bbox=(20, 50, 58, 500),
++            label="table",
++            score=0.8,
++            image_width=1000,
++            image_height=1400,
++        )
++    ]
++    kept = filter_scan_edge_artifacts(detections)
++    assert len(kept) == 1
++    assert kept[0].bbox == (20.0, 50.0, 58.0, 500.0)
++
++
++def test_filter_scan_edge_artifacts_keeps_wide_table_touching_left_edge():
++    detections = [
++        DetectionRecord(
++            pdf_page=29,
++            bbox=(1, 50, 240, 500),
++            label="table",
++            score=0.8,
++            image_width=1000,
++            image_height=1400,
++        )
++    ]
++    kept = filter_scan_edge_artifacts(detections)
++    assert len(kept) == 1
++    assert kept[0].bbox == (1.0, 50.0, 240.0, 500.0)
++
++
++def test_filter_scan_edge_artifacts_removes_box_at_width_ratio_threshold():
++    detections = [
++        DetectionRecord(
++            pdf_page=29,
++            bbox=(3, 50, 53, 500),
++            label="table",
++            score=0.8,
++            image_width=1000,
++            image_height=1400,
++        )
++    ]
++    kept = filter_scan_edge_artifacts(detections, edge_max_width_ratio=0.05)
++    assert kept == []
++
++
++def test_filter_scan_edge_artifacts_keeps_normal_table_detection():
++    detections = [
++        DetectionRecord(
++            pdf_page=31,
++            bbox=(120, 80, 780, 950),
++            label="table",
++            score=0.9,
++            image_width=1000,
++            image_height=1400,
++        )
++    ]
++    kept = filter_scan_edge_artifacts(detections)
++    assert len(kept) == 1
++    assert kept[0].bbox == (120.0, 80.0, 780.0, 950.0)
++
++
++def test_filter_scan_edge_artifacts_rejects_negative_edge_margin():
++    detections = [
++        DetectionRecord(
++            pdf_page=31,
++            bbox=(120, 80, 780, 950),
++            label="table",
++            score=0.9,
++            image_width=1000,
++            image_height=1400,
++        )
++    ]
++    with pytest.raises(HarvestError):
++        filter_scan_edge_artifacts(detections, edge_margin_px=-1)
++
++
++@pytest.mark.parametrize("ratio", [-0.1, 1.1])
++def test_filter_scan_edge_artifacts_rejects_out_of_range_width_ratio(ratio):
++    detections = [
++        DetectionRecord(
++            pdf_page=31,
++            bbox=(120, 80, 780, 950),
++            label="table",
++            score=0.9,
++            image_width=1000,
++            image_height=1400,
++        )
++    ]
++    with pytest.raises(HarvestError):
++        filter_scan_edge_artifacts(detections, edge_max_width_ratio=ratio)
++
++
+ def test_match_detections_is_one_to_one():
+     predictions = [
+         DetectionRecord(pdf_page=20, bbox=(10, 10, 50, 50), label="table", score=0.9),
