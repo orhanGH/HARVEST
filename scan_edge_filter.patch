@@ -1,0 +1,27 @@
+From 0c537dad7f3ef99b0cb5fcf4b5795eb60e2145a6 Mon Sep 17 00:00:00 2001
+From: "copilot-swe-agent[bot]" <198982749+Copilot@users.noreply.github.com>
+Date: Fri, 11 Sep 2026 12:06:24 +0000
+Subject: [PATCH] Count edge-filter inputs only when filter is enabled
+
+Co-authored-by: orhanGH <82941519+orhanGH@users.noreply.github.com>
+---
+ scripts/table_detection/detect_tables_pdf.py | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/scripts/table_detection/detect_tables_pdf.py b/scripts/table_detection/detect_tables_pdf.py
+index 596cf19..670b7f4 100755
+--- a/scripts/table_detection/detect_tables_pdf.py
++++ b/scripts/table_detection/detect_tables_pdf.py
+@@ -161,8 +161,8 @@ def run_detection(args: argparse.Namespace) -> dict[str, Any]:
+             )
+             raw_prediction_count += len(page_predictions)
+             page_predictions = filter_labels(page_predictions, TABLE_LABELS)
+-            edge_filter_input_count += len(page_predictions)
+             if args.edge_artifact_filter:
++                edge_filter_input_count += len(page_predictions)
+                 filtered_predictions = filter_scan_edge_artifacts(
+                     page_predictions,
+                     edge_margin_px=args.edge_margin_px,
+-- 
+2.55.0
+
