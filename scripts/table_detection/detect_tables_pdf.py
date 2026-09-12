@@ -16,6 +16,7 @@ from harvest_ocr.table_detection import (
     DetectionRecord,
     clip_bbox,
     evaluate_detections,
+    filter_scan_edge_artifacts,
     filter_labels,
     load_annotations,
     pad_bbox,
@@ -72,6 +73,32 @@ def build_parser() -> argparse.ArgumentParser:
         default=0.5,
         help="IoU threshold for prediction/annotation matching",
     )
+    edge_filter_group = parser.add_mutually_exclusive_group()
+    edge_filter_group.add_argument(
+        "--edge-artifact-filter",
+        dest="edge_artifact_filter",
+        action="store_true",
+        help="Filter narrow detections touching the left page boundary",
+    )
+    edge_filter_group.add_argument(
+        "--no-edge-artifact-filter",
+        dest="edge_artifact_filter",
+        action="store_false",
+        help="Disable left-edge artifact filtering",
+    )
+    parser.set_defaults(edge_artifact_filter=True)
+    parser.add_argument(
+        "--edge-margin-px",
+        type=float,
+        default=5.0,
+        help="Left-page margin in pixels used for edge artifact filtering",
+    )
+    parser.add_argument(
+        "--edge-max-width-ratio",
+        type=float,
+        default=0.05,
+        help="Maximum bbox_width/image_width ratio to treat as an edge artifact",
+    )
     parser.add_argument(
         "--save-page-renders",
         action="store_true",
@@ -106,6 +133,8 @@ def run_detection(args: argparse.Namespace) -> dict[str, Any]:
     detections: list[DetectionRecord] = []
     pages_payload: list[dict[str, Any]] = []
     raw_prediction_count = 0
+    edge_filter_input_count = 0
+    edge_filter_removed_count = 0
 
     with fitz.open(pdf_path) as document:
         pages = parse_page_range(args.pages, document.page_count)
@@ -132,6 +161,15 @@ def run_detection(args: argparse.Namespace) -> dict[str, Any]:
             )
             raw_prediction_count += len(page_predictions)
             page_predictions = filter_labels(page_predictions, TABLE_LABELS)
+            if args.edge_artifact_filter:
+                edge_filter_input_count += len(page_predictions)
+                filtered_predictions = filter_scan_edge_artifacts(
+                    page_predictions,
+                    edge_margin_px=args.edge_margin_px,
+                    edge_max_width_ratio=args.edge_max_width_ratio,
+                )
+                edge_filter_removed_count += len(page_predictions) - len(filtered_predictions)
+                page_predictions = filtered_predictions
             page_predictions = suppress_overlapping_detections(
                 page_predictions,
                 iou_threshold=args.duplicate_iou_threshold,
@@ -178,12 +216,19 @@ def run_detection(args: argparse.Namespace) -> dict[str, Any]:
         "page_count": len(pages),
         "pages_with_predictions": sum(1 for page in pages_payload if page["detection_count"] > 0),
         "detections_before_filtering": raw_prediction_count,
+        "detections_before_edge_filtering": edge_filter_input_count,
+        "detections_removed_by_edge_filtering": edge_filter_removed_count,
         "detections_after_filtering": len(detection_rows),
         "label_counts": dict(sorted(label_counts.items())),
         "threshold": args.threshold,
         "dpi": args.dpi,
         "bbox_padding": args.bbox_padding,
         "kept_labels": list(TABLE_LABELS),
+        "edge_artifact_filter": {
+            "enabled": bool(args.edge_artifact_filter),
+            "edge_margin_px": args.edge_margin_px,
+            "edge_max_width_ratio": args.edge_max_width_ratio,
+        },
         "artifacts": {
             "pages_jsonl": str(output_dir / "pages.jsonl"),
             "detections_jsonl": str(output_dir / "detections.jsonl"),
