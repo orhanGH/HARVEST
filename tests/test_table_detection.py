@@ -11,6 +11,7 @@ from harvest_ocr.table_detection import (
     filter_scan_edge_artifacts,
     load_annotations,
     match_detections,
+    merge_table_fragments,
     normalize_bbox,
     overlap_ratio,
     pad_bbox,
@@ -164,6 +165,97 @@ def test_filter_scan_edge_artifacts_rejects_out_of_range_width_ratio(ratio):
     ]
     with pytest.raises(HarvestError):
         filter_scan_edge_artifacts(detections, edge_max_width_ratio=ratio)
+
+
+def _fragment(
+    bbox,
+    *,
+    page=30,
+    label="table",
+    score=0.5,
+    image_width=1530,
+    image_height=1786,
+):
+    return DetectionRecord(
+        pdf_page=page,
+        bbox=bbox,
+        label=label,
+        score=score,
+        document_id="sample",
+        image_width=image_width,
+        image_height=image_height,
+        source="model",
+    )
+
+
+def test_merge_table_fragments_merges_page30_style_fragments():
+    detections = [
+        _fragment((257.331, 518.244, 1360.872, 1114.935), score=0.2355),
+        _fragment((245.249, 995.461, 1353.302, 1342.566), score=0.1491),
+    ]
+    merged = merge_table_fragments(detections)
+    assert len(merged) == 1
+    assert merged[0].bbox == (245.249, 518.244, 1360.872, 1342.566)
+    assert merged[0].score == pytest.approx(0.2355)
+    assert merged[0].metadata["fragment_merged"] is True
+    assert len(merged[0].metadata["fragment_merge_components"]) == 2
+
+
+def test_merge_table_fragments_merges_page36_style_fragments():
+    detections = [
+        _fragment((262.029, 667.773, 1380.528, 876.129), page=36, score=0.1630),
+        _fragment((276.298, 398.471, 1380.163, 708.603), page=36, score=0.1160),
+    ]
+    merged = merge_table_fragments(detections)
+    assert len(merged) == 1
+    assert merged[0].bbox == (262.029, 398.471, 1380.528, 876.129)
+
+
+def test_merge_table_fragments_keeps_vertically_separated_boxes():
+    detections = [
+        _fragment((100, 100, 1300, 400)),
+        _fragment((110, 450, 1310, 800)),
+    ]
+    assert len(merge_table_fragments(detections)) == 2
+
+
+def test_merge_table_fragments_keeps_horizontally_misaligned_boxes():
+    detections = [
+        _fragment((0, 100, 800, 500)),
+        _fragment((700, 400, 1500, 800)),
+    ]
+    assert len(merge_table_fragments(detections)) == 2
+
+
+def test_merge_table_fragments_keeps_narrow_boxes():
+    detections = [
+        _fragment((100, 100, 700, 500)),
+        _fragment((110, 400, 710, 800)),
+    ]
+    assert len(merge_table_fragments(detections)) == 2
+
+
+def test_merge_table_fragments_normalizes_table_rotated_label():
+    detections = [
+        _fragment((100, 100, 1300, 500), label="table", score=0.4),
+        _fragment((110, 400, 1310, 800), label="table rotated", score=0.8),
+    ]
+    merged = merge_table_fragments(detections)
+    assert len(merged) == 1
+    assert merged[0].label == "table rotated"
+    assert merged[0].score == pytest.approx(0.8)
+
+
+def test_merge_table_fragments_merges_iteratively():
+    detections = [
+        _fragment((100, 100, 1300, 350), score=0.7),
+        _fragment((105, 300, 1305, 550), score=0.6),
+        _fragment((110, 500, 1310, 750), score=0.5),
+    ]
+    merged = merge_table_fragments(detections)
+    assert len(merged) == 1
+    assert merged[0].bbox == (100.0, 100.0, 1310.0, 750.0)
+    assert len(merged[0].metadata["fragment_merge_components"]) == 3
 
 
 def test_match_detections_is_one_to_one():

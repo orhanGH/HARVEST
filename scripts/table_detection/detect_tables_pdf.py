@@ -19,6 +19,7 @@ from harvest_ocr.table_detection import (
     filter_scan_edge_artifacts,
     filter_labels,
     load_annotations,
+    merge_table_fragments,
     pad_bbox,
     serialize_bbox,
     suppress_overlapping_detections,
@@ -99,6 +100,32 @@ def build_parser() -> argparse.ArgumentParser:
         default=0.05,
         help="Maximum bbox_width/image_width ratio to treat as an edge artifact",
     )
+    fragment_merge_group = parser.add_mutually_exclusive_group()
+    fragment_merge_group.add_argument(
+        "--fragment-merge",
+        dest="fragment_merge",
+        action="store_true",
+        help="Merge compatible wide, vertically overlapping table fragments",
+    )
+    fragment_merge_group.add_argument(
+        "--no-fragment-merge",
+        dest="fragment_merge",
+        action="store_false",
+        help="Disable logical table fragment merging",
+    )
+    parser.set_defaults(fragment_merge=True)
+    parser.add_argument(
+        "--fragment-min-width-ratio",
+        type=float,
+        default=0.50,
+        help="Minimum bbox_width/image_width ratio required for fragment merging",
+    )
+    parser.add_argument(
+        "--fragment-min-horizontal-overlap",
+        type=float,
+        default=0.80,
+        help="Minimum horizontal overlap relative to the narrower fragment",
+    )
     parser.add_argument(
         "--save-page-renders",
         action="store_true",
@@ -135,6 +162,9 @@ def run_detection(args: argparse.Namespace) -> dict[str, Any]:
     raw_prediction_count = 0
     edge_filter_input_count = 0
     edge_filter_removed_count = 0
+    fragment_merge_input_count = 0
+    fragment_merge_output_count = 0
+    fragment_merge_operation_count = 0
 
     with fitz.open(pdf_path) as document:
         pages = parse_page_range(args.pages, document.page_count)
@@ -170,6 +200,16 @@ def run_detection(args: argparse.Namespace) -> dict[str, Any]:
                 )
                 edge_filter_removed_count += len(page_predictions) - len(filtered_predictions)
                 page_predictions = filtered_predictions
+            if args.fragment_merge:
+                fragment_merge_input_count += len(page_predictions)
+                merged_predictions = merge_table_fragments(
+                    page_predictions,
+                    min_width_ratio=args.fragment_min_width_ratio,
+                    min_horizontal_overlap=args.fragment_min_horizontal_overlap,
+                )
+                fragment_merge_output_count += len(merged_predictions)
+                fragment_merge_operation_count += len(page_predictions) - len(merged_predictions)
+                page_predictions = merged_predictions
             page_predictions = suppress_overlapping_detections(
                 page_predictions,
                 iou_threshold=args.duplicate_iou_threshold,
@@ -228,6 +268,14 @@ def run_detection(args: argparse.Namespace) -> dict[str, Any]:
             "enabled": bool(args.edge_artifact_filter),
             "edge_margin_px": args.edge_margin_px,
             "edge_max_width_ratio": args.edge_max_width_ratio,
+        },
+        "detections_before_fragment_merging": fragment_merge_input_count,
+        "detections_after_fragment_merging": fragment_merge_output_count,
+        "fragment_merge_operations": fragment_merge_operation_count,
+        "fragment_merge": {
+            "enabled": bool(args.fragment_merge),
+            "min_width_ratio": args.fragment_min_width_ratio,
+            "min_horizontal_overlap": args.fragment_min_horizontal_overlap,
         },
         "artifacts": {
             "pages_jsonl": str(output_dir / "pages.jsonl"),

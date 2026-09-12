@@ -402,6 +402,133 @@ def filter_scan_edge_artifacts(
     return kept
 
 
+def merge_table_fragments(
+    detections: Sequence[DetectionRecord],
+    *,
+    min_width_ratio: float = 0.50,
+    min_horizontal_overlap: float = 0.80,
+) -> list[DetectionRecord]:
+    """Merge compatible wide, vertically overlapping fragments of one logical table."""
+
+    width_ratio = float(min_width_ratio)
+    horizontal_overlap = float(min_horizontal_overlap)
+    if not 0.0 <= width_ratio <= 1.0:
+        raise HarvestError(
+            f"min_width_ratio must be between 0 and 1, got {min_width_ratio}"
+        )
+    if not 0.0 <= horizontal_overlap <= 1.0:
+        raise HarvestError(
+            "min_horizontal_overlap must be between 0 and 1, "
+            f"got {min_horizontal_overlap}"
+        )
+
+    merged = list(detections)
+    while True:
+        merged_pair = False
+        for left_index in range(len(merged)):
+            for right_index in range(left_index + 1, len(merged)):
+                left = merged[left_index]
+                right = merged[right_index]
+                if not _fragments_are_compatible(
+                    left,
+                    right,
+                    min_width_ratio=width_ratio,
+                    min_horizontal_overlap=horizontal_overlap,
+                ):
+                    continue
+                merged[left_index] = _merge_fragment_pair(left, right)
+                del merged[right_index]
+                merged_pair = True
+                break
+            if merged_pair:
+                break
+        if not merged_pair:
+            return merged
+
+
+def _fragments_are_compatible(
+    left: DetectionRecord,
+    right: DetectionRecord,
+    *,
+    min_width_ratio: float,
+    min_horizontal_overlap: float,
+) -> bool:
+    if left.pdf_page != right.pdf_page:
+        return False
+    if _localization_label(left.label) != _localization_label(right.label):
+        return False
+    if left.document_id and right.document_id and left.document_id != right.document_id:
+        return False
+    if left.image_width is None or right.image_width is None:
+        return False
+
+    left_width = left.bbox[2] - left.bbox[0]
+    right_width = right.bbox[2] - right.bbox[0]
+    if left_width / float(left.image_width) < min_width_ratio:
+        return False
+    if right_width / float(right.image_width) < min_width_ratio:
+        return False
+
+    x_overlap = max(
+        0.0,
+        min(left.bbox[2], right.bbox[2]) - max(left.bbox[0], right.bbox[0]),
+    )
+    smaller_width = min(left_width, right_width)
+    if smaller_width <= 0 or x_overlap / smaller_width < min_horizontal_overlap:
+        return False
+
+    y_overlap = min(left.bbox[3], right.bbox[3]) - max(left.bbox[1], right.bbox[1])
+    return y_overlap > 0
+
+
+def _merge_fragment_pair(left: DetectionRecord, right: DetectionRecord) -> DetectionRecord:
+    left_score = _sort_score(left.score)
+    right_score = _sort_score(right.score)
+    primary = left if left_score >= right_score else right
+    score = None if left.score is None and right.score is None else max(left_score, right_score)
+
+    metadata = dict(primary.metadata)
+    components: list[dict[str, Any]] = []
+    for detection in (left, right):
+        existing = detection.metadata.get("fragment_merge_components")
+        if isinstance(existing, list):
+            components.extend(existing)
+            continue
+        component_metadata = {
+            key: value
+            for key, value in detection.metadata.items()
+            if key not in {"fragment_merged", "fragment_merge_components"}
+        }
+        components.append(
+            {
+                "bbox": serialize_bbox(detection.bbox),
+                "label": detection.label,
+                "score": detection.score,
+                "metadata": component_metadata,
+            }
+        )
+
+    metadata["fragment_merged"] = True
+    metadata["fragment_merge_components"] = components
+
+    return DetectionRecord(
+        pdf_page=primary.pdf_page,
+        bbox=(
+            min(left.bbox[0], right.bbox[0]),
+            min(left.bbox[1], right.bbox[1]),
+            max(left.bbox[2], right.bbox[2]),
+            max(left.bbox[3], right.bbox[3]),
+        ),
+        label=primary.label,
+        score=score,
+        document_id=primary.document_id or left.document_id or right.document_id,
+        image_width=primary.image_width or left.image_width or right.image_width,
+        image_height=primary.image_height or left.image_height or right.image_height,
+        source=primary.source or left.source or right.source,
+        metadata=metadata,
+    )
+
+
 def _annotation_rows_to_detections(row: Any, source_path: Path) -> list[DetectionRecord]:
     if not isinstance(row, dict):
         raise HarvestError(f"Annotation rows in {source_path} must be JSON objects")
@@ -515,6 +642,7 @@ __all__ = [
     "intersection_bbox",
     "load_annotations",
     "match_detections",
+    "merge_table_fragments",
     "normalize_bbox",
     "overlap_ratio",
     "pad_bbox",

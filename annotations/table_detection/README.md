@@ -83,5 +83,11 @@ is removed only when its left edge is within `edge_margin_px` pixels of the page
 `5`) **and** `bbox_width / image_width` is at or below `edge_max_width_ratio` (default `0.05`). Use
 `--no-edge-artifact-filter` to disable it.
 
+Compatible table fragments are also merged by default after edge-artifact filtering and before
+duplicate suppression. Two detections may merge only when they are on the same page, normalize to
+the same localization class, each spans at least 50% of the rendered page width, their horizontal
+overlap covers at least 80% of the narrower fragment, and they overlap vertically. Use
+`--no-fragment-merge` to disable this step.
+
 Mean IoU is computed over matched prediction/annotation pairs only, and is reported as `0.0` when
 no matches are found.
